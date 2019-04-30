@@ -30,6 +30,38 @@ def connect_google_sheet():
         print('Error: ', ex)
         return 0
 
+def joke(col = None):
+    worksheet = connect_google_sheet()
+    count = len(worksheet.col_values(1))
+    if not col:
+        col = random.randint(1, count)
+    if col < 1 or col > count:
+        return TextSendMessage(text='超出範圍了～')
+    content = worksheet.cell(col, 1).value
+    include_answer = worksheet.cell(col, 2).value != ''
+    if worksheet.cell(col, 2).value != '':
+        message = TemplateSendMessage(
+            alt_text='笑話😂',
+            template=ConfirmTemplate(
+                text=content,
+                actions=[
+                    MessageTemplateAction(
+                        label='🔄',
+                        text='再來一則笑話吧！'
+                    ),
+                    PostbackTemplateAction(
+                        label='❓',
+                        text='❓',
+                        data='action=why&col=' + str(col)
+                    )
+                ]
+            )
+        )
+
+        return message
+    else:
+        return score(col, content)
+
 def score(col, content):
     message = TemplateSendMessage(
         alt_text='評分💯',
@@ -53,7 +85,7 @@ def score(col, content):
                 ),
                 MessageTemplateAction(
                     label='聽過🙉',
-                    text='聽過🙉'
+                    text='再來一則笑話吧！'
                 )
             ]
         )
@@ -113,58 +145,19 @@ def handle_postback(event):
 def handle_message(event):
     msg = event.message.text
     print(msg)
-    if '笑話' in msg:
-        worksheet = connect_google_sheet()
-        col = random.randint(1, len(worksheet.col_values(1)))
-        content = worksheet.cell(col, 1).value
-        include_answer = worksheet.cell(col, 2).value != ''
-        if worksheet.cell(col, 2).value != '':
-            message = TemplateSendMessage(
-                alt_text='笑話😂',
-                template=ConfirmTemplate(
-                    text=content,
-                    actions=[
-                        MessageTemplateAction(
-                            label='聽過🙉',
-                            text='聽過🙉'
-                        ),
-                        PostbackTemplateAction(
-                            label='為啥❓',
-                            text='為啥❓',
-                            data='action=why&col=' + str(col)
-                        )
-                    ]
-                )
-            )
+    if msg.isnumeric():
+        message = joke(int(msg))
+        line_bot_api.reply_message(event.reply_token, message)
 
-            line_bot_api.reply_message(event.reply_token, message)
-        else:
-            line_bot_api.reply_message(event.reply_token, score(col, content))
-        return 0
-    if '聽過' in msg:
-        message = TemplateSendMessage(
-            alt_text='笑話😂',
-            template=ConfirmTemplate(
-                text='那要再來一則笑話嗎～？',
-                actions=[
-                    MessageTemplateAction(
-                        label='❌',
-                        text='不了 掰掰👋'
-                    ),
-                    MessageTemplateAction(
-                        label='⭕',
-                        text='再來一則笑話吧！',
-                    )
-                ]
-            )
-        )
+    if '笑話' in msg:
+        message = joke()
         line_bot_api.reply_message(event.reply_token, message)
         return 0
+
     if '掰掰' in msg:
         message = TextSendMessage(text='想聽笑話的時候再來找我吧～👋！')
         line_bot_api.reply_message(event.reply_token, message)
         return 0
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=os.environ['PORT'])
