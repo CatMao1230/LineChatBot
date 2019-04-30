@@ -30,6 +30,36 @@ def connect_google_sheet():
         print('Error: ', ex)
         return 0
 
+def score(col, content):
+    message = TemplateSendMessage(
+        alt_text='評分💯',
+        template=ButtonsTemplate(
+            text=content,
+            actions=[
+                PostbackTemplateAction(
+                    label='笑死😂',
+                    text='笑死😂',
+                    data='action=response&feedback=5&col=' + str(col)
+                ),
+                PostbackTemplateAction(
+                    label='尷尬🙂',
+                    text='尷尬🙂',
+                    data='action=response&feedback=3&col=' + str(col)
+                ),
+                PostbackTemplateAction(
+                    label='超爛🤬',
+                    text='超爛🤬',
+                    data='action=response&feedback=1&col=' + str(col)
+                ),
+                MessageTemplateAction(
+                    label='聽過🙉',
+                    text='聽過🙉'
+                )
+            ]
+        )
+    )
+    return message
+
 @app.route('/callback', methods=['POST'])
 def callback():
     signature = request.headers['X-Line-Signature']
@@ -52,35 +82,7 @@ def handle_postback(event):
         dic[x[0]] = x[1]
     if dic['action'] == 'why':
         worksheet = connect_google_sheet()
-        content = worksheet.cell(dic['col'], 2).value
-
-        message = TemplateSendMessage(
-            alt_text='評分💯',
-            template=ButtonsTemplate(
-                text=content,
-                actions=[
-                    PostbackTemplateAction(
-                        label='笑死😂',
-                        text='笑死😂',
-                        data='action=response&feedback=5&col=' + dic['col']
-                    ),
-                    PostbackTemplateAction(
-                        label='尷尬🙂',
-                        text='尷尬🙂',
-                        data='action=response&feedback=3&col=' + dic['col']
-                    ),
-                    PostbackTemplateAction(
-                        label='超爛🤬',
-                        text='超爛🤬',
-                        data='action=response&feedback=1&col=' + dic['col']
-                    ),
-                    MessageTemplateAction(
-                        label='聽過🙉',
-                        text='聽過🙉'
-                    )
-                ]
-            )
-        )
+        message = score(dic['col'], worksheet.cell(dic['col'], 2).value)
         line_bot_api.reply_message(event.reply_token, message)
         return 0
     if dic['action'] == 'response':
@@ -90,7 +92,7 @@ def handle_postback(event):
         message = TemplateSendMessage(
             alt_text='感謝評分😇',
             template=ButtonsTemplate(
-                text='感謝你的評分～',
+                text='感謝你的評分～\n大家的評價是：' + worksheet.cell(dic['col'], 5).value + '分',
                 actions=[
                     MessageTemplateAction(
                         label='再來一則笑話吧！',
@@ -115,26 +117,29 @@ def handle_message(event):
         worksheet = connect_google_sheet()
         col = random.randint(1, len(worksheet.col_values(1)))
         content = worksheet.cell(col, 1).value
-
-        message = TemplateSendMessage(
-            alt_text='笑話😂',
-            template=ConfirmTemplate(
-                text=content,
-                actions=[
-                    MessageTemplateAction(
-                        label='聽過🙉',
-                        text='聽過🙉'
-                    ),
-                    PostbackTemplateAction(
-                        label='為啥❓',
-                        text='為啥❓',
-                        data='action=why&col=' + str(col)
-                    )
-                ]
+        include_answer = worksheet.cell(col, 2).value != ''
+        if worksheet.cell(col, 2).value != '':
+            message = TemplateSendMessage(
+                alt_text='笑話😂',
+                template=ConfirmTemplate(
+                    text=content,
+                    actions=[
+                        MessageTemplateAction(
+                            label='聽過🙉',
+                            text='聽過🙉'
+                        ),
+                        PostbackTemplateAction(
+                            label='為啥❓',
+                            text='為啥❓',
+                            data='action=why&col=' + str(col)
+                        )
+                    ]
+                )
             )
-        )
 
-        line_bot_api.reply_message(event.reply_token, message)
+            line_bot_api.reply_message(event.reply_token, message)
+        else:
+            line_bot_api.reply_message(event.reply_token, score(col, content))
         return 0
     if '聽過' in msg:
         message = TemplateSendMessage(
