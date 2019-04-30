@@ -1,11 +1,13 @@
 import os
 import configparser
 import random
-from response import *
+import datetime
+import gspread
 from flask import Flask, request, abort
 from linebot import (LineBotApi, WebhookHandler)
 from linebot.exceptions import (InvalidSignatureError)
 from linebot.models import *
+from oauth2client.service_account import ServiceAccountCredentials as SAC
 
 app = Flask(__name__)
 
@@ -32,29 +34,20 @@ def callback():
 def handle_message(event):
     msg = event.message.text
     print(msg)
-    if '真真' in msg:
-        content = random.choice(wrong_name)
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=content))
-        return 0
-    if msg == '臻臻':
-        message = TemplateSendMessage(
-            alt_text='來聊聊天吧！',
-            template=ButtonsTemplate(
-                title=random.choice(greeting_title),
-                text='想聊點什麼嗎～？',
-                actions=[
-                    MessageTemplateAction(
-                        label='關於臻臻',
-                        text=random.choice(about_me)
-                    ),
-                    MessageTemplateAction(
-                        label='打發時間',
-                        text=random.choice(feel_bored)
-                    )
-                ]
-            )
-        )
-        line_bot_api.reply_message(event.reply_token, message)
+    if '笑話' in msg:
+        GDriveJSON = './line-chatbot-02e7b5e6bb4f.json'
+        GSpreadSheet = 'line-chatbot'
+        try:
+            scope = ['https://www.googleapis.com/auth/spreadsheets','https://www.googleapis.com/auth/drive']
+            key = SAC.from_json_keyfile_name(GDriveJSON, scope)
+            gc = gspread.authorize(key)
+            worksheet = gc.open(GSpreadSheet).worksheet('joke')
+        except Exception as ex:
+            print('Error: ', ex)
+            return 0
+        col = random.randint(1, len(worksheet.col_values(1)))
+        content = worksheet.cell(col, 1).value
+        line_bot_api.reply_message(event.reply_token,TextSendMessage(text=content))
         return 0
 
 if __name__ == '__main__':
