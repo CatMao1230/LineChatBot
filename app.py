@@ -1,7 +1,6 @@
 import os
 import configparser
 import random
-import datetime
 import gspread
 from flask import Flask, request, abort
 from linebot import (LineBotApi, WebhookHandler)
@@ -18,19 +17,21 @@ line_bot_api = LineBotApi(config['line_bot']['channel_access_token'])
 handler = WebhookHandler(config['line_bot']['channel_secret'])
 
 def connect_google_sheet():
-    GDriveJSON = './google-sheet.json'
-    GSpreadSheet = 'line-chatbot'
+    """Return the google worksheet."""
+    google_sheet = './google-sheet.json'
+    sheet = 'line-chatbot'
     try:
-        scope = ['https://www.googleapis.com/auth/spreadsheets','https://www.googleapis.com/auth/drive']
-        key = SAC.from_json_keyfile_name(GDriveJSON, scope)
+        scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+        key = SAC.from_json_keyfile_name(google_sheet, scope)
         gc = gspread.authorize(key)
-        worksheet = gc.open(GSpreadSheet).worksheet('joke')
+        worksheet = gc.open(sheet).worksheet('joke')
         return worksheet
     except Exception as ex:
         print('Error: ', ex)
         return 0
 
-def joke(col = None):
+def joke_message(col=None):
+    """Return the joke message."""
     worksheet = connect_google_sheet()
     count = len(worksheet.col_values(1))
     if not col:
@@ -59,10 +60,10 @@ def joke(col = None):
         )
 
         return message
-    else:
-        return score(col, content)
+    return score_message(col, content)
 
-def score(col, content):
+def score_message(col, content):
+    """Return the score message."""
     message = TemplateSendMessage(
         alt_text='評分💯',
         template=ButtonsTemplate(
@@ -94,6 +95,7 @@ def score(col, content):
 
 @app.route('/callback', methods=['POST'])
 def callback():
+    """Callback event."""
     signature = request.headers['X-Line-Signature']
     body = request.get_data(as_text=True)
     app.logger.info('Request body: ' + body)
@@ -107,6 +109,7 @@ def callback():
 
 @handler.add(PostbackEvent)
 def handle_postback(event):
+    """Postback event."""
     data = event.postback.data.split('&')
     data = [x.split('=') for x in data]
     dic = {}
@@ -114,13 +117,15 @@ def handle_postback(event):
         dic[x[0]] = x[1]
     if dic['action'] == 'why':
         worksheet = connect_google_sheet()
-        message = score(dic['col'], worksheet.cell(dic['col'], 2).value)
+        message = score_message(dic['col'], worksheet.cell(dic['col'], 2).value)
         line_bot_api.reply_message(event.reply_token, message)
         return 0
     if dic['action'] == 'response':
         worksheet = connect_google_sheet()
-        worksheet.update_cell(dic['col'], 3, int(worksheet.cell(dic['col'], 3).value) + int(dic['feedback']))
-        worksheet.update_cell(dic['col'], 4, int(worksheet.cell(dic['col'], 4).value) + 1)
+        score = int(worksheet.cell(dic['col'], 3).value) + int(dic['feedback'])
+        count = int(worksheet.cell(dic['col'], 4).value) + 1
+        worksheet.update_cell(dic['col'], 3, score)
+        worksheet.update_cell(dic['col'], 4, count)
         message = TemplateSendMessage(
             alt_text='感謝評分😇',
             template=ButtonsTemplate(
@@ -140,17 +145,17 @@ def handle_postback(event):
         line_bot_api.reply_message(event.reply_token, message)
         return 0
 
-
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
+    """Handle with users' message."""
     msg = event.message.text
-    print(msg)
     if msg.isnumeric():
-        message = joke(int(msg))
+        message = joke_message(int(msg))
         line_bot_api.reply_message(event.reply_token, message)
+        return 0
 
     if '笑話' in msg:
-        message = joke()
+        message = joke_message()
         line_bot_api.reply_message(event.reply_token, message)
         return 0
 
