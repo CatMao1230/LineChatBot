@@ -30,6 +30,46 @@ def connect_google_sheet():
         print('Error: ', ex)
         return 0
 
+def main_message():
+    message = TemplateSendMessage(
+        alt_text='主選單👩',
+        template=CarouselTemplate(
+            columns=[
+                CarouselColumn(
+                    thumbnail_image_url='https://images.pexels.com/photos/1831234/pexels-photo-1831234.jpeg',
+                    title='笑話',
+                    text='🔸心情不美麗就來則笑話吧～！\n🔸也可以輸入數字聽指定笑話',
+                    actions=[
+                        MessageTemplateAction(
+                            label='想聽笑話',
+                            text='來一則笑話吧～！'
+                        ),
+                        MessageTemplateAction(
+                            label='分享笑話',
+                            text='我想跟你分享笑話'
+                        )
+                    ]
+                ),
+                CarouselColumn(
+                    thumbnail_image_url='https://images.pexels.com/photos/19670/pexels-photo.jpg',
+                    title='尚未開放',
+                    text='🙈',
+                    actions=[
+                        MessageTemplateAction(
+                            label='1⃣',
+                            text='尚未開放～'
+                        ),
+                        MessageTemplateAction(
+                            label='2⃣',
+                            text='尚未開放～'
+                        )
+                    ]
+                )
+            ]
+        )
+    )
+    return message
+
 def joke_message(col=None):
     """Return the joke message."""
     worksheet = connect_google_sheet()
@@ -145,12 +185,28 @@ def handle_postback(event):
         line_bot_api.reply_message(event.reply_token, message)
         return 0
 
+@handler.add(FollowEvent)
+def handle_follow(event):
+    message = TextSendMessage(text='Hi 😜\n呼叫臻臻就可以秀出主選單喔！')
+    line_bot_api.reply_message(event.reply_token, [message, main_message()])
+    return 0
+
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     """Handle with users' message."""
     msg = event.message.text
+    print(msg)
     if msg.isnumeric():
         message = joke_message(int(msg))
+        line_bot_api.reply_message(event.reply_token, message)
+        return 0
+
+    if '臻臻' in msg:
+        line_bot_api.reply_message(event.reply_token, main_message())
+        return 0
+
+    if '分享笑話' in msg:
+        message = TextSendMessage(text='目前還沒有開放這個功能😓')
         line_bot_api.reply_message(event.reply_token, message)
         return 0
 
